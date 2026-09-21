@@ -1,78 +1,119 @@
 <script setup>
 import { ref } from 'vue'
 
+// const message = ref('')
+// const reply = ref('')
 const message = ref('')
-const reply = ref('')
+const messages = ref([])
 const loading = ref(false)
 
 async function sendMessage() {
-  if (!message.value.trim()) {
+  const userMessage = message.value.trim()
+
+  if (!userMessage || loading.value) {
     return
   }
 
   loading.value = true
-  reply.value = ''
+
+  // 1. 先把用户消息加入聊天记录
+  messages.value.push({
+    role: 'user',
+    content: userMessage,
+  })
+
+  // 2. 清空输入框
+  message.value = ''
+
+  /*
+   * 3. 保存这一次真正发给后端的历史
+   *
+   * 注意：
+   * 此时还没有加入空的 assistant 消息。
+   */
+  const requestMessages = messages.value.map((item) => ({
+    role: item.role,
+    content: item.content,
+  }))
+
+  /*
+   * 4. 先在页面创建一个空的 AI 消息。
+   *
+   * 后面流式 chunk 会不断追加进去。
+   */
+  messages.value.push({
+    role: 'assistant',
+    content: '',
+  })
+
+  const assistantIndex =
+    messages.value.length - 1
 
   try {
-    const response = await fetch('/api/chat/stream', {
-      method: 'POST',
+    const response = await fetch(
+      '/api/chat/stream',
+      {
+        method: 'POST',
 
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+
+        body: JSON.stringify({
+          messages: requestMessages,
+        }),
       },
-
-      body: JSON.stringify({
-        message: message.value,
-      }),
-    })
+    )
 
     if (!response.ok) {
-      throw new Error(`请求失败：${response.status}`)
+      throw new Error(
+        `请求失败：${response.status}`,
+      )
     }
 
     if (!response.body) {
-      throw new Error('浏览器无法读取流式响应')
+      throw new Error(
+        '浏览器无法读取流式响应',
+      )
     }
 
-    // 从 HTTP Response 中取得“数据流读取器”
-    const reader = response.body.getReader()
+    const reader =
+      response.body.getReader()
 
-    // 把 UTF-8 字节转换成 JavaScript 字符串
-    const decoder = new TextDecoder('utf-8')
+    const decoder =
+      new TextDecoder('utf-8')
 
     let buffer = ''
 
     while (true) {
-      const { value, done } = await reader.read()
+      const { value, done } =
+        await reader.read()
 
       if (done) {
         break
       }
 
-      // 一批新的字节到达
-      buffer += decoder.decode(value, {
-        stream: true,
-      })
+      buffer += decoder.decode(
+        value,
+        {
+          stream: true,
+        },
+      )
 
-      /*
-       * SSE 每一个事件之间有一个空行：
-       *
-       * data: xxx
-       *
-       * data: xxx
-       *
-       */
-      const events = buffer.split(/\r?\n\r?\n/)
+      const events =
+        buffer.split(/\r?\n\r?\n/)
 
-      // 最后一部分可能还没传完整
       buffer = events.pop() ?? ''
 
       for (const event of events) {
-        const lines = event.split(/\r?\n/)
+        const lines =
+          event.split(/\r?\n/)
 
         const dataLines = lines
-          .filter((line) => line.startsWith('data:'))
+          .filter((line) =>
+            line.startsWith('data:'),
+          )
           .map((line) => {
             let data = line.slice(5)
 
@@ -87,21 +128,33 @@ async function sendMessage() {
           continue
         }
 
-        const data = dataLines.join('\n')
+        const data =
+          dataLines.join('\n')
 
         if (data === '[DONE]') {
           continue
         }
 
-        // 最关键的一行：
-        // 每收到一段，就立即加到页面上
-        reply.value += data
+        /*
+         * 最关键：
+         *
+         * 把每一个 chunk
+         * 加到当前 assistant 消息上。
+         */
+        messages.value[
+          assistantIndex
+        ].content += data
       }
     }
   } catch (error) {
-    console.error('请求失败：', error)
+    console.error(
+      '请求失败：',
+      error,
+    )
 
-    reply.value =
+    messages.value[
+      assistantIndex
+    ].content =
       '请求失败，请查看浏览器控制台'
   } finally {
     loading.value = false
@@ -126,8 +179,16 @@ async function sendMessage() {
         </button>
       </div>
 
-      <div v-if="reply" class="reply">
-        {{ reply }}
+      <div class="messages">
+        <div v-for="(item, index) in messages" :key="index" class="message" :class="item.role">
+          <strong>
+            {{ item.role === 'user' ? 'You' : 'AI' }}
+          </strong>
+
+          <div>
+            {{ item.content }}
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -187,5 +248,31 @@ button:disabled {
   padding: 16px;
   background: white;
   border-radius: 8px;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.message {
+  padding: 14px 16px;
+  border-radius: 10px;
+  line-height: 1.6;
+}
+
+.message.user {
+  background: #e9e9ea;
+}
+
+.message.assistant {
+  background: white;
+}
+
+.message strong {
+  display: block;
+  margin-bottom: 6px;
 }
 </style>

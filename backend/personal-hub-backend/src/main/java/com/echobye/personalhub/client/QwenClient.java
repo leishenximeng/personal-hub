@@ -14,11 +14,42 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.function.Consumer;
 
+import com.echobye.personalhub.dto.ChatMessage;
+
 @Component
 public class QwenClient {
 
     private final RestClient restClient;
     private final JsonMapper jsonMapper;
+
+    private List<Message> buildMessages(
+            List<ChatMessage> chatMessages
+    ) {
+
+        List<Message> messages =
+                new java.util.ArrayList<>();
+
+        // 系统提示词
+        messages.add(
+                new Message(
+                        "system",
+                        "You are a helpful assistant."
+                )
+        );
+
+        // 历史聊天记录
+        for (ChatMessage chatMessage : chatMessages) {
+
+            messages.add(
+                    new Message(
+                            chatMessage.role(),
+                            chatMessage.content()
+                    )
+            );
+        }
+
+        return messages;
+    }
 
     public QwenClient(
             RestClient.Builder restClientBuilder,
@@ -43,21 +74,15 @@ public class QwenClient {
     /**
      * 普通非流式聊天
      */
-    public String chat(String userMessage) {
+    public String chat(
+            List<ChatMessage> chatMessages
+    ) {
 
-        QwenRequest request = new QwenRequest(
-                "qwen3.8-flash",
-                List.of(
-                        new Message(
-                                "system",
-                                "You are a helpful assistant."
-                        ),
-                        new Message(
-                                "user",
-                                userMessage
-                        )
-                )
-        );
+        QwenRequest request =
+                new QwenRequest(
+                        "qwen3.8-flash",
+                        buildMessages(chatMessages)
+                );
 
         QwenResponse response = restClient
                 .post()
@@ -71,7 +96,9 @@ public class QwenClient {
                 || response.choices().isEmpty()
                 || response.choices().get(0).message() == null) {
 
-            throw new RuntimeException("Qwen 返回结果为空");
+            throw new RuntimeException(
+                    "Qwen 返回结果为空"
+            );
         }
 
         return response
@@ -87,24 +114,18 @@ public class QwenClient {
      * Qwen 每生成一小段文字，就调用一次 onChunk.accept(...)
      */
     public void streamChat(
-            String userMessage,
+            List<ChatMessage> chatMessages,
             Consumer<String> onChunk
     ) {
 
-        QwenStreamRequest request = new QwenStreamRequest(
-                "qwen3.8-flash",
-                List.of(
-                        new Message(
-                                "system",
-                                "You are a helpful assistant."
-                        ),
-                        new Message(
-                                "user",
-                                userMessage
-                        )
-                ),
-                true
-        );
+        QwenStreamRequest request =
+                new QwenStreamRequest(
+                        "qwen3.8-flash",
+                        buildMessages(chatMessages),
+                        true
+                );
+
+        // 下面原来的流式读取逻辑保持不变
 
         restClient
                 .post()

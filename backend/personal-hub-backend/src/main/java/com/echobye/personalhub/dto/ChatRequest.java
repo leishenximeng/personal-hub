@@ -1,4 +1,8 @@
 package com.echobye.personalhub.dto;
 
-public record ChatRequest(String message) {
+import java.util.List;
+
+public record ChatRequest(
+        List<ChatMessage> messages
+) {
 }

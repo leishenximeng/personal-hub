@@ -3,6 +3,9 @@ package com.echobye.personalhub.service;
 import com.echobye.personalhub.client.QwenClient;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.echobye.personalhub.dto.ChatMessage;
+
+import java.util.List;
 
 import java.io.IOException;
 
@@ -18,47 +21,45 @@ public class ChatService {
     /**
      * 普通非流式聊天
      */
-    public String chat(String message) {
-        return qwenClient.chat(message);
+    public String chat(
+            List<ChatMessage> messages
+    ) {
+        return qwenClient.chat(messages);
     }
 
     /**
      * 流式聊天
      */
-    public SseEmitter streamChat(String message) {
+    public SseEmitter streamChat(
+            List<ChatMessage> messages
+    ) {
 
-        // 5分钟超时
-        SseEmitter emitter = new SseEmitter(300_000L);
+        SseEmitter emitter =
+                new SseEmitter(300_000L);
 
-        /*
-         * Qwen 的网络请求会持续一段时间，
-         * 所以不能堵住 Spring 当前处理请求的线程。
-         *
-         * Java 21 已经正式支持虚拟线程。
-         */
         Thread.startVirtualThread(() -> {
 
             try {
 
-                qwenClient.streamChat(message, chunk -> {
+                qwenClient.streamChat(
+                        messages,
+                        chunk -> {
 
-                    try {
+                            try {
 
-                        // Qwen生成一段
-                        // 就马上发给浏览器一段
-                        emitter.send(
-                                SseEmitter
-                                        .event()
-                                        .data(chunk)
-                        );
+                                emitter.send(
+                                        SseEmitter
+                                                .event()
+                                                .data(chunk)
+                                );
 
-                    } catch (IOException e) {
+                            } catch (IOException e) {
 
-                        throw new RuntimeException(e);
-                    }
-                });
+                                throw new RuntimeException(e);
+                            }
+                        }
+                );
 
-                // 告诉前端：AI输出结束
                 emitter.send(
                         SseEmitter
                                 .event()
