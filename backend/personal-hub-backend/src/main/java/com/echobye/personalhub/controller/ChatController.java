@@ -29,7 +29,10 @@ public class ChatController {
     ) {
 
         String reply =
-                chatService.chat(request.messages());
+                chatService.chat(
+                        request.conversationId(),
+                        request.message()
+                );
 
         return new ChatResponse(reply);
     }
@@ -46,7 +49,8 @@ public class ChatController {
     ) {
 
         return chatService.streamChat(
-                request.messages()
+                request.conversationId(),
+                request.message()
         );
     }
 }

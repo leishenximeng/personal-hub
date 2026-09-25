@@ -1,11 +1,9 @@
 package com.echobye.personalhub.service;
 
 import com.echobye.personalhub.client.QwenClient;
+import com.echobye.personalhub.entity.MessageRole;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import com.echobye.personalhub.dto.ChatMessage;
-
-import java.util.List;
 
 import java.io.IOException;
 
@@ -13,25 +11,53 @@ import java.io.IOException;
 public class ChatService {
 
     private final QwenClient qwenClient;
+    private final ConversationService conversationService;
 
-    public ChatService(QwenClient qwenClient) {
-        this.qwenClient = qwenClient;
-    }
-
-    /**
-     * 普通非流式聊天
-     */
-    public String chat(
-            List<ChatMessage> messages
+    public ChatService(
+            QwenClient qwenClient,
+            ConversationService conversationService
     ) {
-        return qwenClient.chat(messages);
+        this.qwenClient = qwenClient;
+        this.conversationService =
+                conversationService;
     }
 
-    /**
-     * 流式聊天
-     */
+    public String chat(
+            Long conversationId,
+            String message
+    ) {
+
+        // ① 先保存用户消息
+        conversationService.saveMessage(
+                conversationId,
+                MessageRole.USER,
+                message
+        );
+
+        // ② 从数据库获取完整上下文
+        var history =
+                conversationService
+                        .getChatHistory(
+                                conversationId
+                        );
+
+        // ③ 调用 AI
+        String reply =
+                qwenClient.chat(history);
+
+        // ④ 保存 AI 回答
+        conversationService.saveMessage(
+                conversationId,
+                MessageRole.ASSISTANT,
+                reply
+        );
+
+        return reply;
+    }
+
     public SseEmitter streamChat(
-            List<ChatMessage> messages
+            Long conversationId,
+            String message
     ) {
 
         SseEmitter emitter =
@@ -41,9 +67,32 @@ public class ChatService {
 
             try {
 
+                // 保存用户消息
+                conversationService.saveMessage(
+                        conversationId,
+                        MessageRole.USER,
+                        message
+                );
+
+                // PostgreSQL现在是历史记录来源
+                var history =
+                        conversationService
+                                .getChatHistory(
+                                        conversationId
+                                );
+
+                /*
+                 * AI是流式返回的，
+                 * 但数据库最终需要保存完整回答。
+                 */
+                StringBuilder fullReply =
+                        new StringBuilder();
+
                 qwenClient.streamChat(
-                        messages,
+                        history,
                         chunk -> {
+
+                            fullReply.append(chunk);
 
                             try {
 
@@ -58,6 +107,13 @@ public class ChatService {
                                 throw new RuntimeException(e);
                             }
                         }
+                );
+
+                // Qwen全部生成完成以后再保存
+                conversationService.saveMessage(
+                        conversationId,
+                        MessageRole.ASSISTANT,
+                        fullReply.toString()
                 );
 
                 emitter.send(
