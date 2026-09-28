@@ -34,6 +34,11 @@ public class ChatService {
                 message
         );
 
+        conversationService.updateTitleIfNeeded(
+                conversationId,
+                message
+        );
+
         // ② 从数据库获取完整上下文
         var history =
                 conversationService
@@ -71,6 +76,11 @@ public class ChatService {
                 conversationService.saveMessage(
                         conversationId,
                         MessageRole.USER,
+                        message
+                );
+
+                conversationService.updateTitleIfNeeded(
+                        conversationId,
                         message
                 );
 

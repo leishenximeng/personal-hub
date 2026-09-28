@@ -109,4 +109,35 @@ public class ConversationService {
                 )
                 .toList();
     }
+
+    @Transactional
+    public void updateTitleIfNeeded(
+            Long conversationId,
+            String firstMessage
+    ) {
+
+        Conversation conversation =
+                conversationRepository
+                        .findById(conversationId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "对话不存在"
+                                )
+                        );
+
+        // 只有标题仍然叫“新对话”时才修改
+        if (!"新对话".equals(conversation.getTitle())) {
+            return;
+        }
+
+        String title = firstMessage.trim();
+
+        // 太长的话截取前20个字符
+        if (title.length() > 20) {
+            title = title.substring(0, 20) + "...";
+        }
+
+        conversation.setTitle(title);
+    }
 }
