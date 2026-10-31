@@ -7,6 +7,7 @@ import com.echobye.personalhub.entity.ChatMessageEntity;
 import com.echobye.personalhub.entity.Conversation;
 import com.echobye.personalhub.service.ConversationService;
 import org.springframework.web.bind.annotation.*;
+import com.echobye.personalhub.dto.UpdateConversationTitleRequest;
 
 import java.util.List;
 
@@ -88,5 +89,20 @@ public class ConversationController {
                 message.getContent(),
                 message.getCreatedAt()
         );
+    }
+
+    @PatchMapping("/{conversationId}")
+    public ConversationResponse updateTitle(
+            @PathVariable Long conversationId,
+            @RequestBody UpdateConversationTitleRequest request
+    ) {
+
+        Conversation conversation =
+                conversationService.updateTitle(
+                        conversationId,
+                        request.title()
+                );
+
+        return toResponse(conversation);
     }
 }

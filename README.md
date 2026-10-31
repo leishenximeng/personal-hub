@@ -143,3 +143,31 @@ conversation             ↔     conversation_id
 而是：
 
 > **让我们主要用 Java 对象操作数据库，然后由 ORM 帮我们转换成 SQL。**
+
+
+
+
+
+
+
+#### postgresql
+
+项目的 PostgreSQL 是通过 **Docker** 运行的，之前进入数据库用的是这条命令。
+
+**1. 打开 Docker Desktop，然后在 PowerShell 中执行：**
+
+```
+docker exec -it personal-hub-postgres psql -U personalhub -d personal_hub
+```
+
+任何目录都能执行，不必先进入项目文件夹。成功后会看到：
+
+```
+personal_hub=#
+```
+
+
+
+##### 结构图
+
+![image-20260928223150422](./assets/image-20260928223150422.png)

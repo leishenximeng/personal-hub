@@ -27,43 +27,6 @@ async function loadConversations() {
   }
 }
 
-async function createConversation() {
-  if (loading.value) {
-    return
-  }
-
-  try {
-    const response = await fetch('/api/conversations', {
-      method: 'POST',
-
-      headers: {
-        'Content-Type': 'application/json',
-      },
-
-      body: JSON.stringify({
-        title: '新对话',
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`创建对话失败：${response.status}`)
-    }
-
-    const conversation = await response.json()
-
-    // 把新对话加到左侧列表
-    conversations.value.push(conversation)
-
-    // 自动切换到新对话
-    activeConversationId.value = conversation.id
-
-    // 新对话目前没有任何消息
-    messages.value = []
-  } catch (error) {
-    console.error('创建对话失败：', error)
-  }
-}
-
 /**
  * 根据当前 conversationId
  * 从数据库加载聊天记录
@@ -220,9 +183,6 @@ async function sendMessage() {
         messages.value[assistantIndex].content += data
       }
     }
-    // ↓ 新增这一句
-    // AI回答完成后，重新获取左侧对话列表
-    await loadConversations()
   } catch (error) {
     console.error('请求失败：', error)
 
@@ -258,10 +218,6 @@ onMounted(async () => {
     <!-- 左侧对话列表 -->
     <aside class="sidebar">
       <h2>Personal Hub</h2>
-
-      <button class="new-chat-button" :disabled="loading" @click="createConversation">
-        + 新建对话
-      </button>
 
       <div class="conversation-list">
 
@@ -454,19 +410,3 @@ button:disabled {
   opacity: 0.6;
 }
 </style>
-
-.new-chat-button {
-width: 100%;
-margin-bottom: 18px;
-padding: 12px 14px;
-border: 1px solid #ddd;
-border-radius: 8px;
-background: white;
-text-align: left;
-cursor: pointer;
-font-size: 14px;
-}
-
-.new-chat-button:hover {
-background: #f5f5f5;
-}

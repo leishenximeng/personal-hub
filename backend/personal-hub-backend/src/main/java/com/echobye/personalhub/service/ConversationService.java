@@ -140,4 +140,38 @@ public class ConversationService {
 
         conversation.setTitle(title);
     }
+
+    @Transactional
+    public Conversation updateTitle(
+            Long conversationId,
+            String title
+    ) {
+
+        Conversation conversation =
+                conversationRepository
+                        .findById(conversationId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "对话不存在"
+                                )
+                        );
+
+        String newTitle = title.trim();
+
+        if (newTitle.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "标题不能为空"
+            );
+        }
+
+        if (newTitle.length() > 50) {
+            newTitle = newTitle.substring(0, 50);
+        }
+
+        conversation.setTitle(newTitle);
+
+        return conversation;
+    }
 }
