@@ -1,412 +1,198 @@
+
 <script setup>
-import { onMounted, ref } from 'vue'
-
-const message = ref('')
-const messages = ref([])
-const conversations = ref([])
-
-const activeConversationId = ref(null)
-
-const loading = ref(false)
-const loadingMessages = ref(false)
-
-/**
- * 查询所有历史对话
- */
-async function loadConversations() {
-  try {
-    const response = await fetch('/api/conversations')
-
-    if (!response.ok) {
-      throw new Error(`加载对话列表失败：${response.status}`)
-    }
-
-    conversations.value = await response.json()
-  } catch (error) {
-    console.error('加载对话列表失败：', error)
-  }
-}
-
-/**
- * 根据当前 conversationId
- * 从数据库加载聊天记录
- */
-async function loadMessages() {
-  if (!activeConversationId.value) {
-    messages.value = []
-    return
-  }
-
-  loadingMessages.value = true
-
-  try {
-    const response = await fetch(
-      `/api/conversations/${activeConversationId.value}/messages`,
-    )
-
-    if (!response.ok) {
-      throw new Error(`加载聊天记录失败：${response.status}`)
-    }
-
-    const data = await response.json()
-
-    messages.value = data.map((item) => ({
-      role: item.role.toLowerCase(),
-      content: item.content,
-    }))
-  } catch (error) {
-    console.error('加载聊天记录失败：', error)
-  } finally {
-    loadingMessages.value = false
-  }
-}
-
-/**
- * 点击左侧某一场聊天
- */
-async function switchConversation(conversationId) {
-  if (loading.value) {
-    return
-  }
-
-  if (activeConversationId.value === conversationId) {
-    return
-  }
-
-  activeConversationId.value = conversationId
-
-  await loadMessages()
-}
-
-/**
- * 发送消息
- */
-async function sendMessage() {
-  const userMessage = message.value.trim()
-
-  if (!userMessage || loading.value) {
-    return
-  }
-
-  if (!activeConversationId.value) {
-    console.error('当前没有选中的对话')
-    return
-  }
-
-  loading.value = true
-
-  // 先显示用户消息
-  messages.value.push({
-    role: 'user',
-    content: userMessage,
-  })
-
-  message.value = ''
-
-  // 创建一个空的 AI 消息
-  messages.value.push({
-    role: 'assistant',
-    content: '',
-  })
-
-  const assistantIndex = messages.value.length - 1
-
-  try {
-    const response = await fetch('/api/chat/stream', {
-      method: 'POST',
-
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-
-      body: JSON.stringify({
-        conversationId: activeConversationId.value,
-        message: userMessage,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`请求失败：${response.status}`)
-    }
-
-    if (!response.body) {
-      throw new Error('浏览器无法读取流式响应')
-    }
-
-    const reader = response.body.getReader()
-
-    const decoder = new TextDecoder('utf-8')
-
-    let buffer = ''
-
-    while (true) {
-      const { value, done } = await reader.read()
-
-      if (done) {
-        break
-      }
-
-      buffer += decoder.decode(value, {
-        stream: true,
-      })
-
-      const events = buffer.split(/\r?\n\r?\n/)
-
-      buffer = events.pop() ?? ''
-
-      for (const event of events) {
-        const lines = event.split(/\r?\n/)
-
-        const dataLines = lines
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => {
-            let data = line.slice(5)
-
-            if (data.startsWith(' ')) {
-              data = data.slice(1)
-            }
-
-            return data
-          })
-
-        if (dataLines.length === 0) {
-          continue
-        }
-
-        const data = dataLines.join('\n')
-
-        if (data === '[DONE]') {
-          continue
-        }
-
-        messages.value[assistantIndex].content += data
-      }
-    }
-  } catch (error) {
-    console.error('请求失败：', error)
-
-    messages.value[assistantIndex].content =
-      '请求失败，请查看浏览器控制台'
-  } finally {
-    loading.value = false
-  }
-}
-
-/**
- * 页面第一次打开时：
- *
- * 1. 查询所有 Conversation
- * 2. 自动选中第一条
- * 3. 加载第一条 Conversation 的消息
- */
-onMounted(async () => {
-  await loadConversations()
-
-  if (conversations.value.length > 0) {
-    activeConversationId.value =
-      conversations.value[0].id
-
-    await loadMessages()
-  }
-})
+import { RouterLink } from 'vue-router'
 </script>
 
 <template>
-  <main class="page">
+  <main class="home">
+    <div class="container">
 
-    <!-- 左侧对话列表 -->
-    <aside class="sidebar">
-      <h2>Personal Hub</h2>
 
-      <div class="conversation-list">
 
-        <button v-for="conversation in conversations" :key="conversation.id" class="conversation-item" :class="{
-          active:
-            conversation.id === activeConversationId,
-        }" @click="switchConversation(conversation.id)">
-          {{ conversation.title }}
-        </button>
+      <!-- 首页主视觉 -->
+      <section class="hero">
+        <p class="eyebrow">MY DIGITAL SPACE</p>
 
-      </div>
-    </aside>
-
-    <!-- 右侧聊天区域 -->
-    <section class="chat-area">
-
-      <div class="chat-container">
-
-        <h1>AI Assistant</h1>
+        <h1>你好，欢迎来到我的数字空间。</h1>
 
         <p class="description">
-          My personal digital space.
+          这里记录我的项目、学习笔记和 AI 应用探索。
+          一个持续成长的个人网站。
         </p>
 
-        <div v-if="loadingMessages" class="empty-state">
-          正在加载聊天记录...
+        <RouterLink to="/chat" class="primary-button">
+          体验 AI 助手 →
+        </RouterLink>
+      </section>
+
+      <!-- 功能模块 -->
+      <section class="modules">
+        <h2>Explore</h2>
+
+        <div class="card-grid">
+          <article class="card">
+            <span class="card-label">01 / PROJECTS</span>
+            <h3>项目作品</h3>
+            <p>展示我的开发项目、技术实践与工程经验。</p>
+            <span class="status">即将上线</span>
+          </article>
+
+          <article class="card">
+            <span class="card-label">02 / ARTICLES</span>
+            <h3>文章与笔记</h3>
+            <p>记录学习过程，沉淀知识与思考。</p>
+            <span class="status">即将上线</span>
+          </article>
+
+          <article class="card">
+            <span class="card-label">03 / AI</span>
+            <h3>AI Playground</h3>
+            <p>探索大模型、RAG 和 Agent 应用。</p>
+
+            <RouterLink to="/chat" class="card-link">
+              进入 AI Chat →
+            </RouterLink>
+          </article>
         </div>
+      </section>
 
-        <div v-else-if="messages.length === 0" class="empty-state">
-          暂无聊天记录
-        </div>
+      <footer class="footer">
+        Personal Hub · Built with Vue & Spring Boot
+      </footer>
 
-        <div v-else class="messages">
-          <div v-for="(item, index) in messages" :key="index" class="message" :class="item.role">
-
-            <strong>
-              {{ item.role === 'user' ? 'You' : 'AI' }}
-            </strong>
-
-            <div>
-              {{ item.content }}
-            </div>
-
-          </div>
-        </div>
-
-        <div class="chat-box">
-
-          <input v-model="message" type="text" placeholder="输入一句话..." :disabled="loading || !activeConversationId"
-            @keyup.enter="sendMessage" />
-
-          <button :disabled="loading ||
-            !activeConversationId
-            " @click="sendMessage">
-            {{ loading ? '生成中...' : '发送' }}
-          </button>
-
-        </div>
-
-      </div>
-
-    </section>
-
+    </div>
   </main>
 </template>
 
 <style scoped>
-.page {
+.home {
   min-height: 100vh;
-  display: flex;
-  background: #f7f7f8;
+  background: #fafafa;
+  color: #202124;
   font-family: Arial, sans-serif;
 }
 
-/* 左侧 */
-
-.sidebar {
-  width: 260px;
-  padding: 24px 16px;
-  background: white;
-  border-right: 1px solid #e5e5e5;
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 32px;
 }
 
-.sidebar h2 {
-  margin: 0 0 24px;
-  padding: 0 10px;
+
+
+/* 首页主视觉 */
+.hero {
+  padding: 110px 0 120px;
 }
 
-.conversation-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.conversation-item {
-  width: 100%;
-  padding: 12px 14px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.conversation-item:hover {
-  background: #f3f3f3;
-}
-
-.conversation-item.active {
-  background: #e9e9ea;
-}
-
-/* 右侧 */
-
-.chat-area {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  padding: 60px 40px;
-}
-
-.chat-container {
-  width: 700px;
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: #777;
+  font-weight: 600;
 }
 
 h1 {
-  margin-bottom: 8px;
-  font-size: 32px;
+  max-width: 800px;
+  margin: 24px 0;
+  font-size: clamp(32px, 5vw, 54px);
+  line-height: 1.25;
 }
 
 .description {
-  margin-bottom: 32px;
+  max-width: 600px;
+  font-size: 17px;
+  line-height: 1.9;
   color: #666;
+  margin-bottom: 32px;
 }
 
-.messages {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
+.primary-button {
+  display: inline-block;
+  padding: 14px 24px;
+  background: #202124;
+  color: white;
+  border-radius: 9px;
+  text-decoration: none;
+  font-size: 14px;
 }
 
-.message {
-  padding: 14px 16px;
-  border-radius: 10px;
-  line-height: 1.6;
+.primary-button:hover {
+  background: #444;
 }
 
-.message.user {
-  background: #e9e9ea;
+/* 模块卡片 */
+.modules {
+  padding-bottom: 100px;
 }
 
-.message.assistant {
+.modules h2 {
+  margin-bottom: 28px;
+  font-size: 25px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.card {
+  padding: 28px;
+  border: 1px solid #eaeaea;
+  border-radius: 14px;
   background: white;
 }
 
-.message strong {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.empty-state {
-  margin: 40px 0;
+.card-label {
+  font-size: 11px;
+  letter-spacing: 1px;
   color: #999;
-  text-align: center;
 }
 
-.chat-box {
-  display: flex;
-  gap: 12px;
+.card h3 {
+  margin: 24px 0 12px;
+  font-size: 21px;
 }
 
-input {
-  flex: 1;
-  padding: 14px 16px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 16px;
+.card p {
+  color: #777;
+  line-height: 1.8;
+  font-size: 14px;
+  min-height: 76px;
 }
 
-button {
-  padding: 0 24px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+.status {
+  font-size: 12px;
+  color: #aaa;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+.card-link {
+  color: #333;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 底部 */
+.footer {
+  padding: 28px 0;
+  border-top: 1px solid #eaeaea;
+  color: #999;
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .container {
+    padding: 0 20px;
+  }
+
+  .hero {
+    padding: 70px 0;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
