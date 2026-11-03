@@ -1,30 +1,48 @@
 
+
 <script setup>
-// 项目展示数据
-const projects = [
-  {
-    id: 1,
-    name: 'Personal Hub',
-    description: '基于 Spring Boot、Vue 和 PostgreSQL 的个人网站，集成 AI 对话与知识管理功能。',
-    techStack: ['Java', 'Spring Boot', 'Vue 3', 'PostgreSQL'],
-    status: '开发中',
-  },
-  {
-    id: 2,
-    name: 'COVID Dashboard',
-    description: '使用 Python 和 Streamlit 构建的全球疫情数据分析与可视化项目。',
-    techStack: ['Python', 'Pandas', 'Streamlit'],
-    status: '已完成',
-  },
-  {
-    id: 3,
-    name: 'Blog',
-    description: '基于 Spring Boot、Vue 和 MySQL 的前后端分离博客项目。',
-    techStack: ['Java', 'Vue 3', 'MySQL'],
-    status: '基础功能完成',
-  },
-]
+import { onMounted, ref } from 'vue'
+
+// 保存后端返回的项目列表
+const projects = ref([])
+
+// 是否正在加载
+const loading = ref(true)
+
+// 错误提示
+const errorMessage = ref('')
+
+/**
+ * 从 Spring Boot 获取项目列表
+ */
+async function loadProjects() {
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch('/api/projects')
+
+    if (!response.ok) {
+      throw new Error(`加载项目失败：${response.status}`)
+    }
+
+    // 后端 JSON → JavaScript 数组
+    projects.value = await response.json()
+
+  } catch (error) {
+    console.error('加载项目失败：', error)
+    errorMessage.value = '项目加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+// 页面加载后自动查询项目
+onMounted(() => {
+  loadProjects()
+})
 </script>
+
 
 <template>
   <main class="projects-page">
@@ -35,31 +53,39 @@ const projects = [
         <p>这里展示我的开发项目、技术实践与学习成果。</p>
       </header>
 
-      <div class="project-grid">
-        <article
-          v-for="project in projects"
-          :key="project.id"
-          class="project-card"
-        >
-          <span class="status">{{ project.status }}</span>
 
-          <h2>{{ project.name }}</h2>
+<!-- 正在加载 -->
+<p v-if="loading">正在加载项目...</p>
 
-          <p class="description">
-            {{ project.description }}
-          </p>
+<!-- 加载失败 -->
+<p v-else-if="errorMessage">
+  {{ errorMessage }}
+</p>
 
-          <div class="tech-stack">
-            <span
-              v-for="tech in project.techStack"
-              :key="tech"
-              class="tech-tag"
-            >
-              {{ tech }}
-            </span>
-          </div>
-        </article>
-      </div>
+<!-- 没有项目 -->
+<p v-else-if="projects.length === 0">
+  暂无项目
+</p>
+
+<!-- 项目列表 -->
+<div v-else class="project-grid">
+  <article
+    v-for="project in projects"
+    :key="project.id"
+    class="project-card"
+  >
+    <span class="status">
+      {{ project.status }}
+    </span>
+
+    <h2>{{ project.name }}</h2>
+
+    <p class="description">
+      {{ project.description }}
+    </p>
+  </article>
+</div>
+
     </div>
   </main>
 </template>
