@@ -4,6 +4,9 @@ package com.echobye.personalhub.entity;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "projects")
 public class Project {
@@ -20,6 +23,17 @@ public class Project {
 
     @Column(nullable = false, length = 30)
     private String status;
+
+    
+@ElementCollection(fetch = FetchType.EAGER)
+@CollectionTable(
+        name = "project_technologies",
+        joinColumns = @JoinColumn(name = "project_id")
+)
+@OrderColumn(name = "position")
+@Column(name = "technology", nullable = false, length = 50)
+private List<String> techStack = new ArrayList<>();
+
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -66,6 +80,16 @@ public class Project {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    
+public List<String> getTechStack() {
+    return techStack;
+}
+
+public void setTechStack(List<String> techStack) {
+    this.techStack = techStack;
+}
+
 
     public Instant getCreatedAt() {
         return createdAt;
